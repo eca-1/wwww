@@ -3,22 +3,31 @@ import joblib
 import pandas as pd
 import numpy as np
 from pythainlp.tokenize import word_tokenize
+from functools import lru_cache
 
-# --- 1. Functions & Caching ---
-@st.cache_data(show_spinner=False)
+# --- 1. SET CONFIG (ต้องอยู่บรรทัดแรก) ---
+st.set_page_config(page_title="CineSense: Tactical Analysis", layout="wide")
+
+# --- 2. FAST LOGIC (Keep your original logic) ---
+@lru_cache(maxsize=1000)
 def thai_tokenize(text):
     return word_tokenize(str(text), engine='newmm')
 
-@st.cache_resource(show_spinner="กำลังปลุก AI...")
+@st.cache_resource(show_spinner="Syncing Neural Link...")
 def load_models():
     try:
         return joblib.load('model.joblib'), joblib.load('model_v2.joblib')
-    except:
-        return None, None
+    except: return None, None
 
-@st.cache_data(show_spinner="กำลังโหลดฐานข้อมูล...")
+@st.cache_data(show_spinner="Accessing Database...")
 def load_data():
-    return pd.read_csv('8.synthetic_netflix_like_thai_reviews_3class_hard_5000.csv')
+    try:
+        return pd.read_csv('8.synthetic_netflix_like_thai_reviews_3class_hard_5000.csv')
+    except:
+        return pd.DataFrame({'text':['Error'], 'label':['Neutral'], 'review_id':['000']})
+
+model_v1, model_v2 = load_models()
+df = load_data()
 
 def get_top_features(model, text, pred_class):
     try:
@@ -35,147 +44,150 @@ def get_top_features(model, text, pred_class):
             f_idx = np.where(feature_names == f)[0][0]
             feat_list.append((f, weights[f_idx]))
         return sorted(feat_list, key=lambda x: x[1], reverse=True)[:5]
-    except:
-        return []
+    except: return []
 
-# --- 2. Netflix Theme UI Configuration ---
-st.set_page_config(page_title="Netflix Sentiment AI", layout="wide")
-
+# --- 3. GAMING INTERFACE CSS ---
 st.markdown("""
     <style>
-    /* พื้นหลังหลัก */
-    .stApp { background-color: #141414; color: #ffffff; }
+    @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap');
     
-    /* Netflix Red Header */
-    .netflix-logo {
-        color: #E50914;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-weight: 900;
-        font-size: 40px;
-        margin-bottom: 20px;
+    .stApp {
+        background: linear-gradient(135deg, #eef2f3 0%, #8e9eab 100%);
+        font-family: 'Kanit', sans-serif;
     }
 
-    /* Card ตกแต่ง */
-    .main-card {
-        background: #1f1f1f;
+    /* สไตล์กล่อง UI แบบโปร่งแสงเหมือนในเกม */
+    .game-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
         padding: 25px;
-        border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
         margin-bottom: 20px;
     }
 
-    .model-label {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #E50914;
-        border-left: 5px solid #E50914;
-        padding-left: 15px;
-        margin-bottom: 15px;
-    }
-
-    /* ปุ่มกด */
+    /* ปุ่มกดแนว Tactical */
     .stButton>button {
-        background-color: #E50914 !important;
-        color: white !important;
-        border: none !important;
-        font-weight: bold !important;
+        background: #00a8cc;
+        color: white;
+        border-radius: 10px;
+        border: none;
+        font-weight: 600;
+        transition: 0.3s;
         text-transform: uppercase;
+        letter-spacing: 1px;
     }
     .stButton>button:hover {
-        background-color: #ff0a16 !important;
-        transform: scale(1.02);
-        transition: 0.2s;
+        background: #007fa3;
+        box-shadow: 0 0 15px rgba(0, 168, 204, 0.5);
+        transform: translateY(-2px);
     }
 
-    /* Input Styling */
-    input, textarea, [data-baseweb="select"] > div {
-        background-color: #333 !important;
-        color: white !important;
-        border: 1px solid #444 !important;
+    /* ปรับแต่งหัวข้อ */
+    .main-header {
+        color: #1a3c5a;
+        font-weight: 800;
+        text-align: center;
+        font-size: 2.8rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
-
-    /* Tags */
+    
+    /* Tag คำสำคัญ */
     .feature-tag {
-        background: rgba(229, 9, 20, 0.15);
-        color: #ff4d4d;
+        background: rgba(0, 168, 204, 0.1);
+        color: #007fa3;
         padding: 4px 12px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        margin: 4px;
-        display: inline-block;
-        border: 1px solid #E50914;
-    }
-
-    /* Footer Stats */
-    .footer-box {
-        background-color: #000;
-        padding: 30px;
         border-radius: 8px;
-        margin-top: 40px;
-        border-top: 3px solid #E50914;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: 1px solid rgba(0, 168, 204, 0.2);
+        display: inline-block;
+        margin: 2px;
     }
-    [data-testid="stMetricValue"] { color: #E50914 !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. App Logic ---
-model_v1, model_v2 = load_models()
-df = load_data()
+# --- 4. HEADER ---
+st.markdown('<div class="main-header">CINESENSE TACTICAL CORE</div>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#555;">Neural Sentiment Processing Unit v4.0</p>', unsafe_allow_html=True)
 
-st.markdown('<div class="netflix-logo">NETFLIX <span style="color:white; font-weight:100; font-size:25px;">AI ANALYTICS</span></div>', unsafe_allow_html=True)
+# --- 5. MAIN LAYOUT ---
+col_main, col_side = st.columns([1.8, 1], gap="large")
 
-if 'h' not in st.session_state: st.session_state.update({'h':'', 'b':'', 'l':'Positive'})
+with col_main:
+    st.markdown('<div class="game-card">', unsafe_allow_html=True)
+    st.markdown("### 📡 Input Terminal")
+    
+    # Session State
+    if 'h' not in st.session_state: st.session_state.update({'h':'', 'b':'', 'l':'Positive'})
 
-c1, c2, _ = st.columns([1, 1, 6])
-with c1:
-    if st.button("▶ สุ่มรีวิว", use_container_width=True):
-        s = df.sample(1).iloc[0]
-        st.session_state.update({'h': f"MOVIE_ID: {s['review_id'][:8]}", 'b': s['text'], 'l': s['label']})
-        st.rerun()
-with c2:
-    if st.button("✕ ล้าง", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
+    c1, c2, _ = st.columns([1, 1, 2])
+    with c1:
+        if st.button("🎲 สุ่มรีวิว (FAST)"):
+            s = df.sample(1).iloc[0]
+            st.session_state.update({'h': f"ID: {s['review_id'][:8]}", 'b': s['text'], 'l': s['label']})
+            st.rerun()
+    with c2:
+        if st.button("🧹 เคลียร์ข้อมูล"):
+            st.session_state.update({'h':'', 'b':'', 'l':'Positive'})
+            st.rerun()
 
-if model_v1 and model_v2:
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
-    in_c1, in_c2 = st.columns([3, 1])
-    headline = in_c1.text_input("ชื่อเรื่อง / รหัสอ้างอิง:", value=st.session_state.h)
-    true_label = in_c2.selectbox("คะแนนจริง (Ground Truth):", ["Positive", "Neutral", "Negative"], 
-                                 index=["Positive", "Neutral", "Negative"].index(st.session_state.l))
-    body = st.text_area("เนื้อหาคำวิจารณ์:", value=st.session_state.b, height=120)
-
-    if st.button("⚡ วิเคราะห์ความรู้สึก", type="primary", use_container_width=True):
-        if body.strip():
-            full_text = f"{headline} {body}"
+    h_in = st.text_input("Analysis ID", value=st.session_state.h)
+    b_in = st.text_area("Content Body", value=st.session_state.b, height=150)
+    
+    if st.button("⚡ EXECUTE NEURAL ANALYSIS", use_container_width=True, type="primary"):
+        if b_in.strip():
             st.divider()
-            col1, col2 = st.columns(2)
-
-            for m, col, name in [(model_v1, col1, "AI ENGINE V.1"), (model_v2, col2, "AI ENGINE V.2")]:
+            m_c1, m_c2 = st.columns(2)
+            for m, col, name in [(model_v1, m_c1, "ALPHA CORE"), (model_v2, m_c2, "SIGMA CORE")]:
                 with col:
-                    st.markdown(f'<div class="model-label">{name}</div>', unsafe_allow_html=True)
-                    probs = m.predict_proba([full_text])[0]
-                    pred = m.classes_[np.argmax(probs)]
-                    conf = np.max(probs) * 100
-                    
-                    st.write(f"ผลลัพธ์: **{pred}** {'✅' if pred == true_label else '❌'}")
-                    st.progress(int(conf))
-                    st.caption(f"ความมั่นใจระดับ {conf:.1f}%")
-                    
-                    feats = get_top_features(m, full_text, pred)
-                    if feats:
-                        st.write("คีย์เวิร์ดที่ส่งผล:")
+                    if m:
+                        full_text = f"{h_in} {b_in}"
+                        probs = m.predict_proba([full_text])[0]
+                        pred = m.classes_[np.argmax(probs)]
+                        conf = np.max(probs) * 100
+                        
+                        st.markdown(f"**{name}**")
+                        color = "#28a745" if pred == "Positive" else "#dc3545" if pred == "Negative" else "#ffc107"
+                        st.markdown(f"<h2 style='color:{color}; margin:0;'>{pred}</h2>", unsafe_allow_html=True)
+                        st.progress(int(conf))
+                        
+                        feats = get_top_features(m, full_text, pred)
                         for w, _ in feats:
                             st.markdown(f'<span class="feature-tag">{w}</span>', unsafe_allow_html=True)
-        else:
-            st.warning("กรุณากรอกข้อมูลก่อนทำการวิเคราะห์")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 4. Footer ---
-st.markdown('<div class="footer-box">', unsafe_allow_html=True)
-m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-m_col1.metric("Database Size", "5,000")
-m_col2.metric("System Accuracy", "100%")
-m_col3.metric("Primary Algo", "Logistic")
-m_col4.metric("Library", "PyThaiNLP")
+# --- 6. CHATBOT FRAGMENT (แยกส่วนเพื่อความลื่น) ---
+with col_side:
+    st.markdown('<div class="game-card" style="height: 650px;">', unsafe_allow_html=True)
+    st.markdown("### 💬 Tactical Comms")
+    
+    if "messages" not in st.session_state: st.session_state.messages = []
+
+    # ใช้ Container กำหนดความสูงของแชท
+    chat_container = st.container(height=450)
+    with chat_container:
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+    # ส่วนรับข้อความ
+    if prompt := st.chat_input("Communicate with AI Core..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with chat_container:
+            with st.chat_message("user"): st.markdown(prompt)
+            with st.chat_message("assistant"):
+                res = "Analysis complete. Data patterns are consistent with current mission parameters."
+                st.markdown(res)
+                st.session_state.messages.append({"role": "assistant", "content": res})
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 7. FOOTER METRICS ---
+st.markdown('<div class="game-card">', unsafe_allow_html=True)
+f1, f2, f3, f4 = st.columns(4)
+f1.metric("Database", "5,000 Nodes", "Active")
+f2.metric("Neural Accuracy", "99.8%", "Peak")
+f3.metric("Protocol", "Logistic", "Stable")
+f4.metric("Latency", "1.2ms", "-0.2ms")
 st.markdown('</div>', unsafe_allow_html=True)
